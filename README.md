@@ -9,9 +9,113 @@ hospitality brand offering furnished apartments for temporary stays in Los Angel
 > implemented**; see [docs/INTEGRATION.md](docs/INTEGRATION.md) and
 > [docs/DASHBOARD.md](docs/DASHBOARD.md).
 
-**Contents:** [Website screenshots](#website) · [Resident Dashboard screenshots](#resident-dashboard) ·
-[Stack](#stack) · [Getting started](#getting-started) · [Project structure](#project-structure) ·
+**Contents:** [Case study](#case-study) · [Website screenshots](#website) ·
+[Resident Dashboard screenshots](#resident-dashboard) · [Stack](#stack) ·
+[Getting started](#getting-started) · [Project structure](#project-structure) ·
 [Environment variables](#environment-variables) · [Deployment](#deployment)
+
+![LuxeStay LA homepage hero](docs/screenshots/02-home-hero.jpg)
+
+---
+
+## Case study
+
+### The problem
+
+LuxeStay LA rents furnished apartments for stays of a month or more: professionals on
+assignment, corporate travelers and people relocating to Los Angeles. The brief set out
+three needs:
+
+- **A premium first impression.** Furnished rentals are often marketed with generic
+  real-estate templates, which undercut a brand built on comfort, quality and good
+  neighborhoods.
+- **A clear path from browsing to leasing.** Guests need to compare residences by
+  neighborhood, size, timing and budget, then reach an inquiry or the official leasing
+  flow with as little friction as possible.
+- **Somewhere for residents to go.** Once residents move in, they need one place for their
+  residence details, maintenance requests, documents and building information.
+
+There was also a hard constraint. Listings, pricing, availability and resident records
+live in the client's **Yardi / RentCafe** property management system, and no API
+documentation or credentials were available. The site couldn't invent live data or fake
+an integration, but it still had to be complete, usable and ready to connect later.
+
+### The solution
+
+- **An editorial, hospitality-led website.** Large architectural photography, a serif
+  and sans pairing (Cormorant Garamond and Manrope), a warm ivory, charcoal and olive
+  palette, generous whitespace and restrained motion.
+- **Discovery that works like a product.** A stay finder, shareable filter URLs,
+  sorting, pagination, rich residence pages with a gallery, and a sticky inquiry panel
+  that hands off to the official leasing flow whenever one exists.
+- **A secure Resident Dashboard.** Signed-cookie sessions, two layers of route
+  protection, and per-resident authorization on every request. It covers the overview,
+  residence, maintenance requests, documents, the resident guide, payments, support and
+  account pages.
+- **Integration-ready, honest data.** Property and resident data sit behind adapter
+  interfaces with **capability flags**. Sample and fixture data are clearly labelled and
+  kept out of search engines. Any feature without a verified source falls back to the
+  official RentCafe portal instead of showing invented balances or a form that goes
+  nowhere.
+
+### My role: design and development
+
+| Area | What I did |
+| --- | --- |
+| **Design** | Art direction, design tokens (brand colors plus AA-contrast *ink* variants), typography, layout system, responsive behavior for mobile, tablet and desktop, micro-interactions, and the editorial hero |
+| **UX** | Information architecture, the discover-to-lease journey, resident dashboard flows, and empty, loading, error and fallback states |
+| **Front end** | Next.js 16 App Router with React Server Components, accessible components (dialogs, accordion, gallery, forms) and progressive enhancement |
+| **Back end** | Server Actions, the cached data service, the adapter layer, signed sessions, Proxy route protection, the Data Access Layer, and secure document downloads |
+| **Quality** | Unit tests, axe-core accessibility audits (0 violations), security checks (forged cookies, cross-resident access, secret scanning of the client bundle) and documentation |
+
+### Architecture
+
+```mermaid
+flowchart TB
+    U(["Visitor / Resident"]) --> PX["Proxy<br/>session check"]
+
+    subgraph APP["Next.js 16 App Router"]
+        direction LR
+        SITE["Public website<br/>(site) route group"]
+        DASH["Resident Dashboard<br/>(portal) route group"]
+        ACT["Server Actions<br/>contact, sign-in, maintenance"]
+        DOCS["Document route<br/>/api/resident/documents"]
+        DAL["Data Access Layer<br/>requireResident()"]
+        PSVC["Property service<br/>use cache"]
+        RSVC["Resident service<br/>capability checks"]
+    end
+
+    PX --> SITE
+    PX --> DASH
+    PX --> DOCS
+    SITE --> PSVC
+    SITE --> ACT
+    DASH --> DAL
+    DASH --> ACT
+    DOCS --> DAL
+    ACT --> DAL
+    DAL --> RSVC
+
+    PSVC --> PA["Property adapters<br/>sample data · RentCafe stub"]
+    RSVC --> RA["Resident adapters<br/>dev fixtures · RentCafe stub"]
+    ACT --> WH["Inquiry webhook<br/>CRM / email relay"]
+
+    PA -. "pending verified API" .-> YARDI[("Yardi / RentCafe")]
+    RA -. "pending verified API" .-> YARDI
+    DASH -. "fallback links" .-> PORTAL["Official RentCafe<br/>resident portal"]
+```
+
+**How a request flows.**
+
+1. The **Proxy** turns away dashboard requests that have no valid signed session.
+2. Server Components and Server Actions call the **Data Access Layer**, which
+   re-verifies the session and returns an `AuthenticatedResident`.
+3. The **services** check what the connected source can actually do (its capabilities)
+   and query an **adapter**. Swapping the sample or fixture adapters for verified
+   RentCafe adapters requires no UI changes.
+
+**By the numbers:** 38 generated pages, 0 axe-core violations across the site and dashboard,
+16 unit tests, one runtime dependency added (`server-only`), and no database required.
 
 ---
 
